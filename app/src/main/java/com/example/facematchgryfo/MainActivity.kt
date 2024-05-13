@@ -19,6 +19,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCapture.OutputFileOptions
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -27,6 +28,11 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.abs
+import android.util.Base64
+import java.io.ByteArrayOutputStream
+import java.io.FileInputStream
+import android.util.Log
+import com.github.kittinunf.fuel.Fuel
 
 
 class MainActivity : AppCompatActivity() {
@@ -66,8 +72,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         mainBinding.captureImageButton.setOnClickListener{
-            takePhoto()
+            takePhotos()
         }
+    }
+
+    private fun sendImagesToServer(image1Base64: String, image2Base64: String) {
+        val url = "https://api.gryfo.com.br/face_match"
+        val body = """
+            {
+                "image1": "$image1Base64",
+                "image2": "$image2Base64"
+            }
+        """.trimIndent()
+
+        Fuel.post(url)
+            .body(body)
+            .response { result ->
+                result.fold(
+                    success = {
+                        Toast.makeText(this@MainActivity, "Imagens enviadas com sucesso", Toast.LENGTH_SHORT).show()
+                    },
+                    failure = { error ->
+                        Toast.makeText(this@MainActivity, "Erro ao enviar imagens: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
     }
 
     override fun onRequestPermissionsResult(
@@ -156,10 +185,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun takePhoto(){
+    private fun takePhotos() {
+        // Captura a primeira foto
+        capturePhoto { image1Base64 ->
+            // Captura a segunda foto
+            capturePhoto { image2Base64 ->
+                // Aqui você pode usar as imagens base64 como quiser
+                Log.d("MainActivity", "Foto 1 base64: $image1Base64")
+                Log.d("MainActivity", "Foto 2 base64: $image2Base64")
+            }
+        }
+    }
+    private fun capturePhoto(onCaptured: (String) -> Unit) {
         val imageFolder = File(
             Environment.getExternalStoragePublicDirectory(
-            Environment.DIRECTORY_PICTURES), "Images"
+                Environment.DIRECTORY_PICTURES), "Images"
         )
         if (!imageFolder.exists()) {
             imageFolder.mkdirs()
@@ -174,15 +214,6 @@ class MainActivity : AppCompatActivity() {
             outputOption,
             ContextCompat.getMainExecutor(this),
             object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val message = "Photo Capture Succeeded: ${outputFileResults.savedUri}"
-                    Toast.makeText(
-                        this@MainActivity,
-                        message,
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-
                 override fun onError(exception: ImageCaptureException) {
                     Toast.makeText(
                         this@MainActivity,
@@ -191,8 +222,25 @@ class MainActivity : AppCompatActivity() {
                     ).show()
                 }
 
+                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    val base64Image = convertImageToBase64(imageFile)
+                    onCaptured(base64Image)
+                }
             }
         )
+    }
+
+
+    private fun convertImageToBase64(imageFile: File): String {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        val inputStream = FileInputStream(imageFile)
+        val buffer = ByteArray(1024)
+        var bytesRead: Int
+        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+            byteArrayOutputStream.write(buffer, 0, bytesRead)
+        }
+        val byteArray = byteArrayOutputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
     }
 
 

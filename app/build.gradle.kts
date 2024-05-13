@@ -53,6 +53,9 @@ dependencies {
     // If you want to additionally use the CameraX View class
     implementation(libs.androidx.camera.view)
 
+    // fuel
+    implementation(libs.fuel)
+
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
