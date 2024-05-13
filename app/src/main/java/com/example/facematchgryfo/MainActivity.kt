@@ -14,12 +14,10 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
-import androidx.camera.core.CameraProvider
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCapture.OutputFileOptions
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -29,12 +27,18 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.abs
 import android.util.Base64
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.impl.ImageCaptureConfig
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
-import android.util.Log
 import com.github.kittinunf.fuel.Fuel
+import kotlinx.coroutines.CoroutineScope
 import org.json.JSONObject
 import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.github.kittinunf.fuel.coroutines.awaitString
 
 
 class MainActivity : AppCompatActivity() {
@@ -82,44 +86,48 @@ class MainActivity : AppCompatActivity() {
         val url = "https://api.gryfo.com.br/face_match"
         val body = """
         {
-            "image1": "$image1Base64",
-            "image2": "$image2Base64"
+            "document_img": "$image1Base64",
+            "face_img": "$image2Base64"
         }
     """.trimIndent()
 
         val partnerId = "DesafioEstag"
         val apiKey = "9sndf96soADfhnJSgnsJDFiufgnn9suvn498gBN9nfsDesafioEstag"
 
-        Fuel.post(url)
-            .body(body)
-            .header("Content-Type", "application/json")
-            .header("Authorization", "$partnerId:$apiKey")
-            .response { result ->
-                result.fold(
-                    success = { data ->
-                        val responseString = String(data)
-                        val responseObject = JSONObject(responseString)
-                        val responseCode = responseObject.optInt("response_code")
+        // Executa a operação de rede em uma coroutine
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = Fuel.post(url)
+                    .body(body)
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", "$partnerId:$apiKey")
+                    .awaitString()
 
-                        when (responseCode) {
-                            100 -> {
-                                // Sucesso: Mostro a mensagem do servidor
-                                val message = responseObject.optString("message")
-                                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
-                            }
-                            else -> {
-                                // Outros códigos de resposta: Mostro uma msg genérica de erro
-                                val errorMessage = "Ocorreu um erro na requisição. Por favor, tente novamente mais tarde."
-                                Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
-                            }
+                // Processa a resposta na thread principal
+                withContext(Dispatchers.Main) {
+                    val responseObject = JSONObject(response)
+                    val responseCode = responseObject.optInt("response_code")
+
+                    when (responseCode) {
+                        100 -> {
+                            // Sucesso: Mostro a mensagem do servidor
+                            val message = responseObject.optString("message")
+                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
                         }
-                    },
-                    failure = { error ->
-                        // Erro na requisição
-                        Toast.makeText(this@MainActivity, "Erro ao enviar imagens: ${error.message}", Toast.LENGTH_SHORT).show()
+                        else -> {
+                            // Outros códigos de resposta: Mostro uma msg genérica de erro
+                            val errorMessage = "Ocorreu um erro na requisição. Por favor, tente novamente mais tarde."
+                            Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                        }
                     }
-                )
+                }
+            } catch (e: Exception) {
+                // Erro na requisição
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Erro ao enviar imagens: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
+        }
     }
 
 
@@ -211,76 +219,67 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val capturedImages = mutableListOf<String>()
+    private var firstImageCaptured = false
+
     private fun takePhotos() {
-        // Captura a primeira foto
-        capturePhoto { image1Base64 ->
-            // Captura a segunda foto
+        if (!firstImageCaptured) {
+            // Capturar a primeira foto
+            capturePhoto { image1Base64 ->
+                capturedImages.add(image1Base64)
+                firstImageCaptured = true
+            }
+        } else {
+            // Capturar a segunda foto
             capturePhoto { image2Base64 ->
-                // Aqui você pode usar as imagens base64 como quiser
-                Log.d("MainActivity", "Foto 1 base64: $image1Base64")
-                Log.d("MainActivity", "Foto 2 base64: $image2Base64")
+                capturedImages.add(image2Base64)
+                // Verificar se ambas as fotos foram capturadas
+                if (capturedImages.size == 2) {
+                    // Se sim, enviar as imagens para o servidor
+                    sendImagesToServer(capturedImages[0], capturedImages[1])
+                    // Limpar a lista de fotos capturadas
+                    capturedImages.clear()
+                    // Permitir a captura de mais fotos
+                    firstImageCaptured = false
+                } else {
+                    // Trate o caso em que o número de imagens capturadas não é o esperado
+                    Toast.makeText(this@MainActivity, "Erro ao capturar imagens", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
+
+
+
     private fun capturePhoto(onCaptured: (String) -> Unit) {
-        val imageFolder = File(
-            Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "Images"
-        )
-        if (!imageFolder.exists()) {
-            imageFolder.mkdirs()
-        }
-
-        val fileName = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss-SSS", Locale.getDefault())
-            .format(System.currentTimeMillis()) + ".jpg"
-        val imageFile = File(imageFolder, fileName)
-        val outputOption = OutputFileOptions.Builder(imageFile).build()
-
-        imageCapture.takePicture(
-            outputOption,
-            ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exception: ImageCaptureException) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        exception.message.toString(),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val base64Image = convertImageToBase64(imageFile)
-                    onCaptured(base64Image)
-                }
+        // Captura a imagem
+        imageCapture.takePicture(ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageCapturedCallback() {
+            override fun onCaptureSuccess(image: ImageProxy) {
+                // Converte a imagem para Base64 e chama a função de retorno
+                val base64Image = image.toBase64()
+                onCaptured(base64Image)
+                image.close()
             }
-        )
+
+            override fun onError(exception: ImageCaptureException) {
+                Toast.makeText(
+                    this@MainActivity,
+                    exception.message.toString(),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        })
+    }
+
+    private fun ImageProxy.toBase64(): String {
+        val buffer = planes[0].buffer
+        val bytes = ByteArray(buffer.capacity())
+        buffer.get(bytes)
+        return Base64.encodeToString(bytes, Base64.DEFAULT)
     }
 
 
-    private fun convertImageToBase64(imageFile: File): String {
-        val byteArrayOutputStream = ByteArrayOutputStream()
-        var inputStream: FileInputStream? = null
-        try {
-            inputStream = FileInputStream(imageFile)
-            val buffer = ByteArray(1024)
-            var bytesRead: Int
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                byteArrayOutputStream.write(buffer, 0, bytesRead)
-            }
-            val byteArray = byteArrayOutputStream.toByteArray()
-            return Base64.encodeToString(byteArray, Base64.DEFAULT)
-        } catch (e: IOException) {
-            e.printStackTrace()
-        } finally {
-            // Certifica de fechar o FileInputStream, independentemente de ocorrer uma exceção ou não
-            try {
-                inputStream?.close()
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-        }
-        return "" // Retornar uma string vazia em caso de erro
-    }
+
 
 
 }

@@ -55,6 +55,12 @@ dependencies {
 
     // fuel
     implementation(libs.fuel)
+    implementation(libs.fuelCoroutines)
+
+    //coroutines
+    implementation(libs.coroutinesAndroid)
+    implementation(libs.coroutines)
+
 
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
