@@ -33,6 +33,8 @@ import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
 import android.util.Log
 import com.github.kittinunf.fuel.Fuel
+import org.json.JSONObject
+import java.io.IOException
 
 
 class MainActivity : AppCompatActivity() {
@@ -79,25 +81,49 @@ class MainActivity : AppCompatActivity() {
     private fun sendImagesToServer(image1Base64: String, image2Base64: String) {
         val url = "https://api.gryfo.com.br/face_match"
         val body = """
-            {
-                "image1": "$image1Base64",
-                "image2": "$image2Base64"
-            }
-        """.trimIndent()
+        {
+            "image1": "$image1Base64",
+            "image2": "$image2Base64"
+        }
+    """.trimIndent()
+
+        val partnerId = "DesafioEstag"
+        val apiKey = "9sndf96soADfhnJSgnsJDFiufgnn9suvn498gBN9nfsDesafioEstag"
 
         Fuel.post(url)
             .body(body)
+            .header("Content-Type", "application/json")
+            .header("Authorization", "$partnerId:$apiKey")
             .response { result ->
                 result.fold(
-                    success = {
-                        Toast.makeText(this@MainActivity, "Imagens enviadas com sucesso", Toast.LENGTH_SHORT).show()
+                    success = { data ->
+                        val responseString = String(data)
+                        val responseObject = JSONObject(responseString)
+                        val responseCode = responseObject.optInt("response_code")
+
+                        when (responseCode) {
+                            100 -> {
+                                // Sucesso: Mostro a mensagem do servidor
+                                val message = responseObject.optString("message")
+                                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                            }
+                            else -> {
+                                // Outros códigos de resposta: Mostro uma msg genérica de erro
+                                val errorMessage = "Ocorreu um erro na requisição. Por favor, tente novamente mais tarde."
+                                Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     },
                     failure = { error ->
+                        // Erro na requisição
                         Toast.makeText(this@MainActivity, "Erro ao enviar imagens: ${error.message}", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
     }
+
+
+
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
@@ -233,14 +259,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun convertImageToBase64(imageFile: File): String {
         val byteArrayOutputStream = ByteArrayOutputStream()
-        val inputStream = FileInputStream(imageFile)
-        val buffer = ByteArray(1024)
-        var bytesRead: Int
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            byteArrayOutputStream.write(buffer, 0, bytesRead)
+        var inputStream: FileInputStream? = null
+        try {
+            inputStream = FileInputStream(imageFile)
+            val buffer = ByteArray(1024)
+            var bytesRead: Int
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                byteArrayOutputStream.write(buffer, 0, bytesRead)
+            }
+            val byteArray = byteArrayOutputStream.toByteArray()
+            return Base64.encodeToString(byteArray, Base64.DEFAULT)
+        } catch (e: IOException) {
+            e.printStackTrace()
+        } finally {
+            // Certifica de fechar o FileInputStream, independentemente de ocorrer uma exceção ou não
+            try {
+                inputStream?.close()
+            } catch (e: IOException) {
+                e.printStackTrace()
+            }
         }
-        val byteArray = byteArrayOutputStream.toByteArray()
-        return Base64.encodeToString(byteArray, Base64.DEFAULT)
+        return "" // Retornar uma string vazia em caso de erro
     }
 
 
