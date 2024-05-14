@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.coroutinesAndroid)
     implementation(libs.coroutines)
 
+    implementation(libs.androidx.camera.extensions)
 
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)

@@ -10,6 +10,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Environment
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
@@ -256,7 +258,7 @@ class MainActivity : AppCompatActivity() {
         imageCapture.takePicture(ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageCapturedCallback() {
             override fun onCaptureSuccess(image: ImageProxy) {
                 // Converte a imagem para Base64 e chama a função de retorno
-                val base64Image = image.toBase64()
+                val base64Image = image.toBase64Resized()
                 onCaptured(base64Image)
                 image.close()
             }
@@ -271,15 +273,23 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun ImageProxy.toBase64(): String {
+    private fun ImageProxy.toBase64Resized(): String {
+        // Converte os dados da imagem em um array de bytes
         val buffer = planes[0].buffer
         val bytes = ByteArray(buffer.capacity())
         buffer.get(bytes)
-        return Base64.encodeToString(bytes, Base64.DEFAULT)
+
+        // Converte os bytes em um Bitmap
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+
+        // Redimensiona o Bitmap para uma resolução menor
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, bitmap.width / 2, bitmap.height / 2, true)
+
+        // Converte o Bitmap para Base64
+        val outputStream = ByteArrayOutputStream()
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream) // Reduz a qualidade para 50%
+        val bytesResized = outputStream.toByteArray()
+        return Base64.encodeToString(bytesResized, Base64.DEFAULT)
     }
-
-
-
-
 
 }

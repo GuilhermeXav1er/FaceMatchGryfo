@@ -13,6 +13,7 @@ constraintlayout = "2.1.4"
 fuelVersion = "2.3.1"
 coroutinesVersion = "1.5.0"
 fuelCoroutines = "2.3.1"
+camExtensions = "1.0.0"
 
 
 [libraries]
@@ -20,6 +21,7 @@ androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.r
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraLifecycle" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraLifecycle" }
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "cameraLifecycle" }
+androidx-camera-extensions = { module = "androidx.camera:camera-extensions", version.ref = "camExtensions"}
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
