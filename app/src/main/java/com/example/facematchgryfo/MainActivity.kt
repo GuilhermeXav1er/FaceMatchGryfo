@@ -12,27 +12,21 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Environment
 import android.widget.Toast
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCapture.OutputFileOptions
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Locale
 import kotlin.math.abs
 import android.util.Base64
 import androidx.camera.core.ImageProxy
-import androidx.camera.core.impl.ImageCaptureConfig
 import java.io.ByteArrayOutputStream
-import java.io.FileInputStream
 import com.github.kittinunf.fuel.Fuel
 import kotlinx.coroutines.CoroutineScope
 import org.json.JSONObject
@@ -41,6 +35,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.github.kittinunf.fuel.coroutines.awaitString
+import java.io.FileWriter
 
 
 class MainActivity : AppCompatActivity() {
@@ -68,14 +63,12 @@ class MainActivity : AppCompatActivity() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            // Permission is not granted
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.CAMERA),
                 CAMERA_PERMISSION_CODE
             )
         } else {
-            // Permission has already been granted
             openCamera()
         }
 
@@ -91,12 +84,12 @@ class MainActivity : AppCompatActivity() {
             "document_img": "$image1Base64",
             "face_img": "$image2Base64"
         }
-    """.trimIndent()
+        """.trimIndent()
+
 
         val partnerId = "DesafioEstag"
         val apiKey = "9sndf96soADfhnJSgnsJDFiufgnn9suvn498gBN9nfsDesafioEstag"
 
-        // Executa a operação de rede em uma coroutine
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = Fuel.post(url)
@@ -105,26 +98,22 @@ class MainActivity : AppCompatActivity() {
                     .header("Authorization", "$partnerId:$apiKey")
                     .awaitString()
 
-                // Processa a resposta na thread principal
                 withContext(Dispatchers.Main) {
                     val responseObject = JSONObject(response)
                     val responseCode = responseObject.optInt("response_code")
 
                     when (responseCode) {
                         100 -> {
-                            // Sucesso: Mostro a mensagem do servidor
                             val message = responseObject.optString("message")
                             Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
                         }
                         else -> {
-                            // Outros códigos de resposta: Mostro uma msg genérica de erro
                             val errorMessage = "Ocorreu um erro na requisição. Por favor, tente novamente mais tarde."
                             Toast.makeText(this@MainActivity, errorMessage, Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
             } catch (e: Exception) {
-                // Erro na requisição
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Erro ao enviar imagens: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
@@ -144,10 +133,8 @@ class MainActivity : AppCompatActivity() {
 
         if (requestCode == CAMERA_PERMISSION_CODE) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission granted, proceed with opening camera
                 openCamera()
             } else {
-                // Permission denied
                 Toast.makeText(
                     this,
                     "Permissao para camera negada.",
@@ -226,25 +213,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun takePhotos() {
         if (!firstImageCaptured) {
-            // Capturar a primeira foto
             capturePhoto { image1Base64 ->
                 capturedImages.add(image1Base64)
                 firstImageCaptured = true
             }
         } else {
-            // Capturar a segunda foto
             capturePhoto { image2Base64 ->
                 capturedImages.add(image2Base64)
-                // Verificar se ambas as fotos foram capturadas
                 if (capturedImages.size == 2) {
-                    // Se sim, enviar as imagens para o servidor
                     sendImagesToServer(capturedImages[0], capturedImages[1])
-                    // Limpar a lista de fotos capturadas
                     capturedImages.clear()
-                    // Permitir a captura de mais fotos
                     firstImageCaptured = false
                 } else {
-                    // Trate o caso em que o número de imagens capturadas não é o esperado
                     Toast.makeText(this@MainActivity, "Erro ao capturar imagens", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -287,9 +267,24 @@ class MainActivity : AppCompatActivity() {
 
         // Converte o Bitmap para Base64
         val outputStream = ByteArrayOutputStream()
-        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 50, outputStream) // Reduz a qualidade para 50%
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 30, outputStream) // Reduz a qualidade para 50%
         val bytesResized = outputStream.toByteArray()
         return Base64.encodeToString(bytesResized, Base64.DEFAULT)
     }
+
+    private fun saveBodyToFile(body: String, fileName: String) {
+        val file = File(filesDir, fileName)
+
+        try {
+            FileWriter(file).use { writer ->
+                writer.write(body)
+            }
+            Toast.makeText(this, "Body salvo com sucesso em $fileName", Toast.LENGTH_SHORT).show()
+        } catch (e: IOException) {
+            Toast.makeText(this, "Erro ao salvar o body: ${e.message}", Toast.LENGTH_SHORT).show()
+            e.printStackTrace()
+        }
+    }
+
 
 }

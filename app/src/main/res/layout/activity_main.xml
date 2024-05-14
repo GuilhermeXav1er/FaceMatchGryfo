@@ -7,12 +7,22 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <TextView
+        android:id="@+id/serverResponseTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text=""
+        android:textSize="18sp" />
+
     <androidx.camera.view.PreviewView
         android:id="@+id/previewView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_centerInParent="true"
-        />
+        android:layout_below="@id/serverResponseTextView"
+        android:layout_centerInParent="true" />
 
     <ImageButton
         android:id="@+id/captureImageButton"
@@ -25,6 +35,6 @@
         android:contentDescription="@string/photo"
         android:scaleType="centerCrop"
         android:src="@drawable/camera"
-        app:tint="@color/white"
-        />
+        app:tint="@color/white" />
+
 </RelativeLayout>
