@@ -22,7 +22,6 @@ import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
-import java.io.File
 import kotlin.math.abs
 import android.util.Base64
 import androidx.camera.core.ImageProxy
@@ -30,12 +29,10 @@ import java.io.ByteArrayOutputStream
 import com.github.kittinunf.fuel.Fuel
 import kotlinx.coroutines.CoroutineScope
 import org.json.JSONObject
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.github.kittinunf.fuel.coroutines.awaitString
-import java.io.FileWriter
 
 
 class MainActivity : AppCompatActivity() {
@@ -270,20 +267,6 @@ class MainActivity : AppCompatActivity() {
         resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 30, outputStream) // Reduz a qualidade para 50%
         val bytesResized = outputStream.toByteArray()
         return Base64.encodeToString(bytesResized, Base64.DEFAULT)
-    }
-
-    private fun saveBodyToFile(body: String, fileName: String) {
-        val file = File(filesDir, fileName)
-
-        try {
-            FileWriter(file).use { writer ->
-                writer.write(body)
-            }
-            Toast.makeText(this, "Body salvo com sucesso em $fileName", Toast.LENGTH_SHORT).show()
-        } catch (e: IOException) {
-            Toast.makeText(this, "Erro ao salvar o body: ${e.message}", Toast.LENGTH_SHORT).show()
-            e.printStackTrace()
-        }
     }
 
 
