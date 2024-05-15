@@ -76,12 +76,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendImagesToServer(image1Base64: String, image2Base64: String) {
         val url = "https://api.gryfo.com.br/face_match"
-        val body = """
-        {
-            "document_img": "$image1Base64",
-            "face_img": "$image2Base64"
-        }
-        """.trimIndent()
+
+        val body = JSONObject()
+        body.put("document_img", image1Base64)
+        body.put("face_img", image2Base64)
+
+
+//        val body = """
+//        {
+//            "document_img": "$image1Base64",
+//            "face_img": "$image2Base64"
+//        }
+//        """.trimIndent()
 
 
         val partnerId = "DesafioEstag"
@@ -90,7 +96,7 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = Fuel.post(url)
-                    .body(body)
+                    .body(body.toString())
                     .header("Content-Type", "application/json")
                     .header("Authorization", "$partnerId:$apiKey")
                     .awaitString()
